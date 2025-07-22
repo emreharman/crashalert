@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -19,7 +19,7 @@ export default function App() {
   useEffect(() => {
     const bootstrap = async () => {
       try {
-        await deleteDB();
+        //await deleteDB(); // ⚠️ Sadece test için, prod'da silme!
         await initDB();
         const profile = await getProfile();
         setInitialRoute(profile ? 'Home' : 'Welcome');
@@ -34,15 +34,23 @@ export default function App() {
 
   if (initialRoute === null) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Yükleniyor...</Text>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Yükleniyor...</Text>
       </View>
     );
   }
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName={initialRoute}>
+      <Stack.Navigator
+        initialRouteName={initialRoute}
+        screenOptions={{
+          headerStyle: { backgroundColor: '#121212' },
+          headerTintColor: '#fff',
+          headerTitleStyle: { fontWeight: 'bold' },
+          contentStyle: { backgroundColor: '#121212' },
+        }}
+      >
         <Stack.Screen
           name="Welcome"
           component={WelcomeScreen}
@@ -58,3 +66,16 @@ export default function App() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#121212',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+});

@@ -17,6 +17,7 @@
     "react": "19.1.0",
     "react-native": "0.80.1",
     "react-native-gesture-handler": "^2.27.2",
+    "react-native-phone-number-input": "^2.1.0",
     "react-native-reanimated": "^3.18.0",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.13.1",

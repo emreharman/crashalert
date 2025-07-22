@@ -3,13 +3,15 @@ import {
   ScrollView,
   Text,
   TextInput,
-  Button,
   Alert,
   StyleSheet,
-  KeyboardTypeOptions,
   View,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import PhoneInput from 'react-native-phone-number-input';
 import { getProfile, saveProfile, initDB } from '../utils/database';
 
 type FormType = {
@@ -18,10 +20,19 @@ type FormType = {
   birth_year: string;
   blood_type: string;
   health_notes: string;
-  emergency_contacts: string[]; // artık array
+  emergency_contacts: string[];
 };
 
-const bloodTypeOptions = ['0 Rh+', '0 Rh-', 'A Rh+', 'A Rh-', 'B Rh+', 'B Rh-', 'AB Rh+', 'AB Rh-'];
+const bloodTypeOptions = [
+  '0 Rh+',
+  '0 Rh-',
+  'A Rh+',
+  'A Rh-',
+  'B Rh+',
+  'B Rh-',
+  'AB Rh+',
+  'AB Rh-',
+];
 
 export default function ProfileScreen({ navigation }: any) {
   const [form, setForm] = useState<FormType>({
@@ -30,11 +41,39 @@ export default function ProfileScreen({ navigation }: any) {
     birth_year: '',
     blood_type: '',
     health_notes: '',
-    emergency_contacts: [''],
+    emergency_contacts: [],
   });
+
+  const [newContact, setNewContact] = useState('');
+  const [inputKey, setInputKey] = useState(0);
 
   const handleChange = (key: keyof FormType, value: any) => {
     setForm({ ...form, [key]: value });
+  };
+
+  const handleAddContact = () => {
+    if (!newContact.trim()) return;
+    if (form.emergency_contacts.includes(newContact)) return;
+    handleChange('emergency_contacts', [
+      ...form.emergency_contacts,
+      newContact.trim(),
+    ]);
+    setNewContact('');
+    setInputKey(prev => prev + 1);
+  };
+
+  const handleSave = async () => {
+    try {
+      const contactsAsString = form.emergency_contacts
+        .filter(Boolean)
+        .join(',');
+      await saveProfile({ ...form, emergency_contacts: contactsAsString });
+      Alert.alert('Kaydedildi', 'Bilgiler başarıyla kaydedildi.');
+      navigation.navigate('Home');
+    } catch (error) {
+      console.error('Kayıt hatası:', error);
+      Alert.alert('Hata', 'Kayıt sırasında bir hata oluştu.');
+    }
   };
 
   useEffect(() => {
@@ -50,8 +89,10 @@ export default function ProfileScreen({ navigation }: any) {
             blood_type: profile.blood_type || '',
             health_notes: profile.health_notes || '',
             emergency_contacts: profile.emergency_contacts
-              ? profile.emergency_contacts.split(',').map((num: string) => num.trim())
-              : [''],
+              ? profile.emergency_contacts
+                  .split(',')
+                  .map((num: string) => num.trim())
+              : [],
           });
         }
       } catch (error) {
@@ -62,123 +103,217 @@ export default function ProfileScreen({ navigation }: any) {
     loadProfile();
   }, []);
 
-  const handleSave = async () => {
-    try {
-      const contactsAsString = form.emergency_contacts.filter(Boolean).join(',');
-      await saveProfile({ ...form, emergency_contacts: contactsAsString });
-      Alert.alert('Kaydedildi', 'Bilgiler başarıyla kaydedildi.');
-      navigation.navigate('Home');
-    } catch (error) {
-      console.error('Kayıt hatası:', error);
-      Alert.alert('Hata', 'Kayıt sırasında bir hata oluştu.');
-    }
-  };
-
-  const getKeyboardType = (key: keyof FormType): KeyboardTypeOptions => {
-    if (key === 'birth_year') return 'numeric';
-    return 'default';
-  };
-
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Acil Bilgi Formu</Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'height' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 60}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>Acil Bilgi Formu</Text>
 
-      {/* Normal alanlar */}
-      {['name', 'surname', 'birth_year', 'health_notes'].map(key => (
-        <TextInput
-          key={key}
-          style={styles.input}
-          placeholder={key.replace('_', ' ').toUpperCase()}
-          value={form[key as keyof FormType] as string}
-          onChangeText={text => handleChange(key as keyof FormType, text)}
-          keyboardType={getKeyboardType(key as keyof FormType)}
-        />
-      ))}
-
-      {/* Kan Grubu */}
-      <View style={styles.pickerWrapper}>
-        <Text style={styles.pickerLabel}>Kan Grubu</Text>
-        <Picker
-          selectedValue={form.blood_type}
-          onValueChange={value => handleChange('blood_type', value)}
-        >
-          <Picker.Item label="Seçiniz..." value="" />
-          {bloodTypeOptions.map(bt => (
-            <Picker.Item key={bt} label={bt} value={bt} />
-          ))}
-        </Picker>
-      </View>
-
-      {/* Acil Durum Kişileri */}
-      <Text style={styles.pickerLabel}>Acil Durum Kişileri</Text>
-      {form.emergency_contacts.map((contact, index) => (
-        <View key={index} style={styles.contactItem}>
+        {/* Form inputları */}
+        {[
+          { key: 'name', label: 'Ad' },
+          { key: 'surname', label: 'Soyad' },
+          { key: 'birth_year', label: 'Doğum Yılı' },
+          { key: 'health_notes', label: 'Sağlık Notları' },
+        ].map(({ key, label }) => (
           <TextInput
-            style={[styles.input, { flex: 1, marginBottom: 0 }]}
-            placeholder={`Numara ${index + 1}`}
-            value={contact}
-            keyboardType="phone-pad"
-            onChangeText={(text) => {
-              const updated = [...form.emergency_contacts];
-              updated[index] = text;
-              handleChange('emergency_contacts', updated);
-            }}
+            key={key}
+            style={styles.input}
+            placeholder={label}
+            placeholderTextColor="#777"
+            value={form[key as keyof FormType] as string}
+            onChangeText={text => handleChange(key as keyof FormType, text)}
+            keyboardType={key === 'birth_year' ? 'numeric' : 'default'}
           />
-          <Button
-            title="✕"
-            color="#d9534f"
-            onPress={() => {
-              const updated = [...form.emergency_contacts];
-              updated.splice(index, 1);
-              handleChange('emergency_contacts', updated.length ? updated : ['']);
-            }}
-          />
-        </View>
-      ))}
-      <Button
-        title="+ Kişi Ekle"
-        onPress={() => handleChange('emergency_contacts', [...form.emergency_contacts, ''])}
-      />
+        ))}
 
-      {/* Kaydet */}
-      <View style={{ marginTop: 16 }}>
-        <Button title="Kaydet" onPress={handleSave} />
-      </View>
-    </ScrollView>
+        {/* Kan Grubu */}
+        <Text style={styles.label}>Kan Grubu</Text>
+        <View style={styles.pickerWrapper}>
+          <Picker
+            selectedValue={form.blood_type}
+            onValueChange={value => handleChange('blood_type', value)}
+            dropdownIconColor="#fff"
+            style={styles.picker}
+          >
+            <Picker.Item label="Seçiniz..." value="" />
+            {bloodTypeOptions.map(bt => (
+              <Picker.Item key={bt} label={bt} value={bt} />
+            ))}
+          </Picker>
+        </View>
+
+        {/* Yeni Numara Ekle */}
+        <Text style={styles.label}>Yeni Acil Durum Numarası</Text>
+        <PhoneInput
+          defaultCode="TR"
+          key={inputKey}
+          layout="second"
+          placeholder="Telefon Numarası"
+          value={newContact}
+          onChangeFormattedText={text => setNewContact(text)}
+          containerStyle={styles.phoneContainer}
+          textContainerStyle={styles.phoneTextContainer}
+          textInputStyle={styles.phoneTextInput}
+          codeTextStyle={styles.codeTextStyle}
+          flagButtonStyle={styles.flagButton}
+          textInputProps={{
+            placeholderTextColor: '#bbb',
+          }}
+        />
+        <TouchableOpacity style={styles.addButton} onPress={handleAddContact}>
+          <Text style={styles.addButtonText}>+ Ekle</Text>
+        </TouchableOpacity>
+
+        {/* Kayıtlı Numara Listesi */}
+        {form.emergency_contacts.length > 0 && (
+          <>
+            <Text style={styles.label}>Kayıtlı Numara Listesi</Text>
+            {form.emergency_contacts.map((contact, index) => (
+              <View key={index} style={styles.contactItem}>
+                <Text style={styles.savedContact}>{contact}</Text>
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => {
+                    const updated = [...form.emergency_contacts];
+                    updated.splice(index, 1);
+                    handleChange('emergency_contacts', updated);
+                  }}
+                >
+                  <Text style={styles.removeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </>
+        )}
+
+        {/* Kaydet Butonu */}
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+          <Text style={styles.saveButtonText}>Kaydet</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20 },
+  container: {
+    flexGrow: 1,
+    backgroundColor: '#121212',
+    padding: 20,
+  },
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    color: '#fff',
+    marginBottom: 24,
     textAlign: 'center',
   },
+  label: {
+    color: '#bbb',
+    fontWeight: '600',
+    fontSize: 14,
+    marginTop: 16,
+    marginBottom: 8,
+  },
   input: {
+    backgroundColor: '#1e1e1e',
+    color: '#fff',
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#333',
     padding: 12,
     marginBottom: 12,
-    borderRadius: 8,
+    borderRadius: 10,
   },
   pickerWrapper: {
+    backgroundColor: '#1e1e1e',
+    borderColor: '#333',
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 12,
-    overflow: 'hidden',
   },
-  pickerLabel: {
+  picker: {
+    color: '#fff',
+  },
+  phoneContainer: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+    height: 50,
+    paddingRight: 0,
+    width: '100%',
+  },
+  phoneTextContainer: {
+    backgroundColor: '#1e1e1e',
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    paddingVertical: 0,
+  },
+  phoneTextInput: {
+    color: '#fff',
+    fontSize: 16,
+    paddingVertical: 0,
+  },
+  codeTextStyle: {
+    color: '#fff',
     fontWeight: 'bold',
-    marginBottom: 4,
-    marginTop: 12,
+  },
+  flagButton: {
+    backgroundColor: '#1e1e1e',
+    borderTopLeftRadius: 10,
+    borderBottomLeftRadius: 10,
   },
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
+  },
+  savedContact: {
+    color: '#fff',
+    fontSize: 16,
+    flex: 1,
+  },
+  removeButton: {
+    backgroundColor: '#d9534f',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  removeButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  addButton: {
+    backgroundColor: '#444',
+    padding: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  saveButton: {
+    backgroundColor: '#1e88e5',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Button, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
 import { getProfile } from '../utils/database';
+import { capitalize } from '../utils/functions';
 
 export default function HomeScreen({ navigation }: any) {
   const [profile, setProfile] = useState<any>(null);
@@ -20,27 +27,109 @@ export default function HomeScreen({ navigation }: any) {
 
   if (!profile) {
     return (
-      <View style={styles.container}>
-        <Text>Yükleniyor...</Text>
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Yükleniyor...</Text>
       </View>
     );
   }
 
+  const fields = [
+    { key: 'name', label: 'Ad' },
+    { key: 'surname', label: 'Soyad' },
+    { key: 'birth_year', label: 'Doğum Yılı' },
+    { key: 'blood_type', label: 'Kan Grubu' },
+    { key: 'health_notes', label: 'Sağlık Notları' },
+    { key: 'emergency_contacts', label: 'Acil Durum Kişileri' },
+  ];
+
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Kayıtlı Bilgiler</Text>
-      {Object.entries(profile).map(([key, value]) => (
-        <Text key={key} style={styles.item}>
-          {key.replace('_', ' ')}: {String(value)}
-        </Text>
-      ))}
-      <Button title="Düzenle" onPress={() => navigation.navigate('Profile')} />
-    </View>
+
+      {fields.map(({ key, label }) => {
+        const value = profile[key];
+        if (!value) return null;
+
+        return (
+          <View key={key} style={styles.card}>
+            <Text style={styles.cardLabel}>{label}</Text>
+            {key === 'emergency_contacts' ? (
+              value.split(',').map((num: string, idx: number) => (
+                <Text key={idx} style={styles.cardValue}>
+                  {`• ${num}`}
+                </Text>
+              ))
+            ) : (
+              <Text style={styles.cardValue}>
+                {typeof value === 'string' ? capitalize(value) : String(value)}
+              </Text>
+            )}
+          </View>
+        );
+      })}
+
+      <TouchableOpacity
+        style={styles.editButton}
+        onPress={() => navigation.navigate('Profile')}
+      >
+        <Text style={styles.editButtonText}>Düzenle</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 20 },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
-  item: { fontSize: 16, marginBottom: 8 },
+  container: {
+    flexGrow: 1,
+    backgroundColor: '#121212',
+    padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#121212',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: '#1e1e1e',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  cardLabel: {
+    color: '#bbb',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  cardValue: {
+    color: '#fff',
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  editButton: {
+    backgroundColor: '#1e88e5',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  editButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

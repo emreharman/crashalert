@@ -49,22 +49,33 @@ export const saveProfile = async (form: {
     emergency_contacts: string;
 }) => {
     const db = await openDB();
+    const birthYear = form.birth_year ? parseInt(form.birth_year) : null;
+
     await db.transaction((tx: any) => {
         tx.executeSql('DELETE FROM emergency_profile');
+
         tx.executeSql(
             `INSERT INTO emergency_profile (name, surname, birth_year, blood_type, health_notes, emergency_contacts)
        VALUES (?, ?, ?, ?, ?, ?)`,
             [
                 form.name,
                 form.surname,
-                parseInt(form.birth_year),
+                birthYear,
                 form.blood_type,
                 form.health_notes,
                 form.emergency_contacts,
-            ]
+            ],
+            () => {
+                console.log('✅ Kayıt başarıyla kaydedildi.');
+            },
+            (_: any, error: any) => {
+                console.error('❌ SQLite Insert Error:', error);
+                return false; // hatayı işlemeye devam et
+            }
         );
     });
 };
+
 
 export const deleteDB = async () => {
     return new Promise((resolve, reject) => {
