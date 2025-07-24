@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  Platform,
+  NativeModules,
+} from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -8,8 +15,10 @@ import HomeScreen from './src/screens/HomeScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 
 import { initDB, getProfile, deleteDB } from './src/utils/database';
+import { requestAndroidPermissions } from './src/utils/functions';
 
 const Stack = createNativeStackNavigator();
+const { CrashServiceStarter } = NativeModules; // Native Kotlin Module
 
 export default function App() {
   const [initialRoute, setInitialRoute] = useState<'Welcome' | 'Home' | null>(
@@ -23,8 +32,19 @@ export default function App() {
         await initDB();
         const profile = await getProfile();
         setInitialRoute(profile ? 'Home' : 'Welcome');
+
+        const granted = await requestAndroidPermissions();
+
+        if (granted && Platform.OS === 'android') {
+          try {
+            CrashServiceStarter.startService();
+            console.log('Crash detection service started');
+          } catch (error) {
+            console.error('Servis başlatılamadı:', error);
+          }
+        }
       } catch (error) {
-        console.error('Veritabanı başlatılırken hata:', error);
+        console.error('Başlatma hatası:', error);
         setInitialRoute('Welcome');
       }
     };
