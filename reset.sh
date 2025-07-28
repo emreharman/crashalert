@@ -18,6 +18,9 @@ yarn install
 echo "🧼 Gradle temizliği yapılıyor..."
 cd android && ./gradlew clean && cd ..
 
+echo "🧬 Codegen dosyaları oluşturuluyor..."
+./gradlew generateCodegenArtifactsFromSchema
+
 echo "✅ Her şey temizlendi ve tekrar kuruldu."
 echo ""
 echo "🚀 Artık şu komutla projeyi başlatabilirsin:"
