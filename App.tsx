@@ -3,10 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  Alert,
   Platform,
   NativeModules,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -14,34 +14,26 @@ import WelcomeScreen from './src/screens/WelcomeScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 
-import { initDB, getProfile, deleteDB } from './src/utils/database';
+import { initDB, getProfile } from './src/utils/database';
 import { requestAndroidPermissions } from './src/utils/functions';
 
 const Stack = createNativeStackNavigator();
-const { CrashServiceStarter } = NativeModules; // Native Kotlin Module
+const { CrashServiceStarter } = NativeModules;
 
 export default function App() {
-  const [initialRoute, setInitialRoute] = useState<'Welcome' | 'Home' | null>(
-    null,
-  );
+  const [initialRoute, setInitialRoute] = useState<'Welcome' | 'Home' | null>(null);
 
   useEffect(() => {
     const bootstrap = async () => {
       try {
-        //await deleteDB(); // ⚠️ Sadece test için, prod'da silme!
         await initDB();
         const profile = await getProfile();
-        setInitialRoute(profile ? 'Home' : 'Welcome');
+        const onboardingStep = await AsyncStorage.getItem('onboardingStep');
 
-        const granted = await requestAndroidPermissions();
-
-        if (granted && Platform.OS === 'android') {
-          try {
-            CrashServiceStarter.startService();
-            console.log('Crash detection service started');
-          } catch (error) {
-            console.error('Servis başlatılamadı:', error);
-          }
+        if (profile && onboardingStep === 'completed') {
+          setInitialRoute('Home');
+        } else {
+          setInitialRoute('Welcome');
         }
       } catch (error) {
         console.error('Başlatma hatası:', error);

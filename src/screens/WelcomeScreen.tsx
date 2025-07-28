@@ -1,60 +1,74 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, Text } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type Props = NativeStackScreenProps<any, 'Welcome'>;
+import Step0Intro from '../components/welcomeScreen/Step0Intro';
+import Step1Personal from '../components/welcomeScreen/Step1Personal';
+import Step2Health from '../components/welcomeScreen/Step2Health';
+import Step3Emergency from '../components/welcomeScreen/Step3Emergency';
+import Step4Permissions from '../components/welcomeScreen/Step4Permissions';
+import Step5Config from '../components/welcomeScreen/Step5Config';
 
-export default function WelcomeScreen({ navigation }: Props) {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Hoş Geldin 👋</Text>
-      <Text style={styles.subtitle}>
-        Bu uygulama bir kaza algılandığında acil kişilere otomatik bilgi gönderir.
-      </Text>
+export default function WelcomeScreen({ navigation }: any) {
+  const [step, setStep] = useState<number>(0);
 
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('Profile')}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.buttonText}>Bilgileri Girmeye Başla</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  useEffect(() => {
+    const restoreStep = async () => {
+      const storedStep = await AsyncStorage.getItem('onboardingStep');
+      if (storedStep) {
+        setStep(parseInt(storedStep, 10));
+      }
+    };
+    restoreStep();
+  }, []);
+
+  const updateStep = async (newStep: number) => {
+    await AsyncStorage.setItem('onboardingStep', newStep.toString());
+    setStep(newStep);
+  };
+
+  const goToHome = () => {
+    navigation.replace('Home');
+  };
+
+  const renderStep = () => {
+    switch (step) {
+      case 0:
+        return <Step0Intro onNext={() => updateStep(1)} />;
+      case 1:
+        return <Step1Personal onNext={() => updateStep(2)} />;
+      case 2:
+        return <Step2Health onNext={() => updateStep(3)} />;
+      case 3:
+        return <Step3Emergency onNext={() => updateStep(4)} />;
+      case 4:
+        return <Step4Permissions onNext={() => updateStep(5)} />;
+      case 5:
+        return <Step5Config onFinish={goToHome} />;
+      default:
+        return (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Tanımsız adım: {step}</Text>
+          </View>
+        );
+    }
+  };
+
+  return <View style={styles.container}>{renderStep()}</View>;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212', // Dark background
+    backgroundColor: '#121212',
+  },
+  errorContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 16,
-    color: '#ffffff',
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#bbbbbb',
-    marginBottom: 32,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  button: {
-    backgroundColor: '#1e88e5', // Accent color
-    paddingVertical: 14,
-    paddingHorizontal: 28,
-    borderRadius: 12,
-    elevation: 2,
-  },
-  buttonText: {
+  errorText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
   },
 });

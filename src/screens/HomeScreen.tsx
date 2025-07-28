@@ -5,17 +5,44 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Platform,
+  NativeModules,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getProfile } from '../utils/database';
 import { capitalize } from '../utils/functions';
+
+const { CrashServiceStarter } = NativeModules;
 
 export default function HomeScreen({ navigation }: any) {
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
+    const initService = async () => {
+      try {
+        const prefRaw = await AsyncStorage.getItem('@preferences');
+        const prefs = prefRaw ? JSON.parse(prefRaw) : null;
+
+        if (prefs && Platform.OS === 'android') {
+          await CrashServiceStarter.configureCrashService({
+            alarm: prefs.alarm ?? true,
+            sms: prefs.sms ?? true,
+            location: true,
+            gLimit: prefs.gLimit ?? 4.5,
+          });
+          CrashServiceStarter.startService();
+          console.log('✅ Servis konfigüre edildi ve başlatıldı.');
+        }
+      } catch (err) {
+        console.warn('⚠️ Servis başlatılamadı:', err);
+      }
+    };
+
     const fetchData = async () => {
       try {
         const data = await getProfile();
+        console.log(data);
+        
         if (data) setProfile(data);
       } catch (error) {
         console.error('Profil getirilemedi:', error);
@@ -23,6 +50,7 @@ export default function HomeScreen({ navigation }: any) {
     };
 
     fetchData();
+    initService();
   }, []);
 
   if (!profile) {
@@ -56,7 +84,7 @@ export default function HomeScreen({ navigation }: any) {
             {key === 'emergency_contacts' ? (
               value.split(',').map((num: string, idx: number) => (
                 <Text key={idx} style={styles.cardValue}>
-                  {`• ${num}`}
+                  • {num}
                 </Text>
               ))
             ) : (

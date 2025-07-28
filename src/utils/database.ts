@@ -2,7 +2,7 @@ import SQLite from 'react-native-sqlite-storage';
 
 SQLite.enablePromise(true);
 
-const dbName = 'veritabani.db';
+const dbName = 'crashalert.db';
 
 export const openDB = async () => {
     return SQLite.openDatabase({ name: dbName, location: 'default' });

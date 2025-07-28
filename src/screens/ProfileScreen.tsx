@@ -9,10 +9,15 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import PhoneInput from 'react-native-phone-number-input';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getProfile, saveProfile, initDB } from '../utils/database';
+import { NativeModules } from 'react-native';
+
+const { CrashServiceStarter } = NativeModules;
 
 type FormType = {
   name: string;
@@ -44,6 +49,8 @@ export default function ProfileScreen({ navigation }: any) {
     emergency_contacts: [],
   });
 
+  const [alarm, setAlarm] = useState<boolean>(true);
+  const [gLimitKm, setGLimitKm] = useState<string>('25');
   const [newContact, setNewContact] = useState('');
   const [inputKey, setInputKey] = useState(0);
 
@@ -64,11 +71,41 @@ export default function ProfileScreen({ navigation }: any) {
 
   const handleSave = async () => {
     try {
+      if (form.emergency_contacts.length === 0) {
+        Alert.alert('Acil durum numarası boş olamaz');
+        return;
+      }
+
       const contactsAsString = form.emergency_contacts
         .filter(Boolean)
         .join(',');
-      await saveProfile({ ...form, emergency_contacts: contactsAsString });
-      Alert.alert('Kaydedildi', 'Bilgiler başarıyla kaydedildi.');
+
+      await saveProfile({
+        ...form,
+        emergency_contacts: contactsAsString,
+      });
+
+      // GÜNCELLENMİŞ gLimit hesaplaması
+      const speed = parseFloat(gLimitKm);
+      const timeToStop = 0.3; // saniye
+      const speedMs = speed / 3.6;
+      const acceleration = speedMs / timeToStop;
+      const gLimit = acceleration / 9.81;
+
+      const preferences = {
+        alarm,
+        sms: true,
+        gLimit,
+      };
+
+      await AsyncStorage.setItem('@preferences', JSON.stringify(preferences));
+      await CrashServiceStarter.configureCrashService({
+        ...preferences,
+        location: true,
+      });
+      CrashServiceStarter.startService();
+
+      Alert.alert('Kaydedildi', 'Bilgiler ve tercihler başarıyla kaydedildi.');
       navigation.navigate('Home');
     } catch (error) {
       console.error('Kayıt hatası:', error);
@@ -95,6 +132,17 @@ export default function ProfileScreen({ navigation }: any) {
               : [],
           });
         }
+
+        const savedPrefs = await AsyncStorage.getItem('@preferences');
+        if (savedPrefs) {
+          const prefs = JSON.parse(savedPrefs);
+          setAlarm(!!prefs.alarm);
+          if (prefs.gLimit) {
+            const timeToStop = 0.3;
+            const speedKm = (prefs.gLimit * 9.81 * timeToStop * 3.6).toFixed(0);
+            setGLimitKm(speedKm);
+          }
+        }
       } catch (error) {
         console.error('Profil yüklenirken hata:', error);
       }
@@ -106,8 +154,8 @@ export default function ProfileScreen({ navigation }: any) {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'height' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 60}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={60}
     >
       <ScrollView
         contentContainerStyle={styles.container}
@@ -115,7 +163,7 @@ export default function ProfileScreen({ navigation }: any) {
       >
         <Text style={styles.title}>Acil Bilgi Formu</Text>
 
-        {/* Form inputları */}
+        {/* Text Inputs */}
         {[
           { key: 'name', label: 'Ad' },
           { key: 'surname', label: 'Soyad' },
@@ -133,7 +181,7 @@ export default function ProfileScreen({ navigation }: any) {
           />
         ))}
 
-        {/* Kan Grubu */}
+        {/* Blood Type Picker */}
         <Text style={styles.label}>Kan Grubu</Text>
         <View style={styles.pickerWrapper}>
           <Picker
@@ -149,11 +197,11 @@ export default function ProfileScreen({ navigation }: any) {
           </Picker>
         </View>
 
-        {/* Yeni Numara Ekle */}
+        {/* Emergency Contacts */}
         <Text style={styles.label}>Yeni Acil Durum Numarası</Text>
         <PhoneInput
-          defaultCode="TR"
           key={inputKey}
+          defaultCode="TR"
           layout="second"
           placeholder="Telefon Numarası"
           value={newContact}
@@ -163,15 +211,12 @@ export default function ProfileScreen({ navigation }: any) {
           textInputStyle={styles.phoneTextInput}
           codeTextStyle={styles.codeTextStyle}
           flagButtonStyle={styles.flagButton}
-          textInputProps={{
-            placeholderTextColor: '#bbb',
-          }}
+          textInputProps={{ placeholderTextColor: '#bbb' }}
         />
         <TouchableOpacity style={styles.addButton} onPress={handleAddContact}>
           <Text style={styles.addButtonText}>+ Ekle</Text>
         </TouchableOpacity>
 
-        {/* Kayıtlı Numara Listesi */}
         {form.emergency_contacts.length > 0 && (
           <>
             <Text style={styles.label}>Kayıtlı Numara Listesi</Text>
@@ -193,7 +238,20 @@ export default function ProfileScreen({ navigation }: any) {
           </>
         )}
 
-        {/* Kaydet Butonu */}
+        {/* Preferences */}
+        <Text style={styles.label}>Alarm Aktif</Text>
+        <Switch value={alarm} onValueChange={setAlarm} />
+
+        <Text style={styles.label}>Uyarı Hızı (km/h)</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Örn: 25"
+          placeholderTextColor="#777"
+          keyboardType="numeric"
+          value={gLimitKm}
+          onChangeText={setGLimitKm}
+        />
+
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
           <Text style={styles.saveButtonText}>Kaydet</Text>
         </TouchableOpacity>
@@ -203,11 +261,7 @@ export default function ProfileScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    backgroundColor: '#121212',
-    padding: 20,
-  },
+  container: { flexGrow: 1, backgroundColor: '#121212', padding: 20 },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -228,8 +282,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#333',
     padding: 12,
-    marginBottom: 12,
     borderRadius: 10,
+    marginBottom: 12,
   },
   pickerWrapper: {
     backgroundColor: '#1e1e1e',
@@ -238,9 +292,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 12,
   },
-  picker: {
-    color: '#fff',
-  },
+  picker: { color: '#fff' },
   phoneContainer: {
     backgroundColor: '#1e1e1e',
     borderRadius: 10,
@@ -256,41 +308,12 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 10,
     paddingVertical: 0,
   },
-  phoneTextInput: {
-    color: '#fff',
-    fontSize: 16,
-    paddingVertical: 0,
-  },
-  codeTextStyle: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
+  phoneTextInput: { color: '#fff', fontSize: 16, paddingVertical: 0 },
+  codeTextStyle: { color: '#fff', fontWeight: 'bold' },
   flagButton: {
     backgroundColor: '#1e1e1e',
     borderTopLeftRadius: 10,
     borderBottomLeftRadius: 10,
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  savedContact: {
-    color: '#fff',
-    fontSize: 16,
-    flex: 1,
-  },
-  removeButton: {
-    backgroundColor: '#d9534f',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  removeButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
   },
   addButton: {
     backgroundColor: '#444',
@@ -300,10 +323,21 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 16,
   },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+  addButtonText: { color: '#fff', fontWeight: '600' },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
   },
+  savedContact: { color: '#fff', fontSize: 16, flex: 1 },
+  removeButton: {
+    backgroundColor: '#d9534f',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  removeButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   saveButton: {
     backgroundColor: '#1e88e5',
     padding: 14,
@@ -311,9 +345,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 12,
   },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
