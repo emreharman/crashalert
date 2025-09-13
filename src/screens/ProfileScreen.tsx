@@ -39,6 +39,8 @@ const bloodTypeOptions = [
   'AB Rh-',
 ];
 
+const MAX_CONTACTS = 3;
+
 export default function ProfileScreen({ navigation }: any) {
   const [form, setForm] = useState<FormType>({
     name: '',
@@ -61,6 +63,10 @@ export default function ProfileScreen({ navigation }: any) {
   const handleAddContact = () => {
     if (!newContact.trim()) return;
     if (form.emergency_contacts.includes(newContact)) return;
+    if (form.emergency_contacts.length >= MAX_CONTACTS) {
+      Alert.alert('Uyarı', `En fazla ${MAX_CONTACTS} numara ekleyebilirsin.`);
+      return;
+    }
     handleChange('emergency_contacts', [
       ...form.emergency_contacts,
       newContact.trim(),
@@ -74,6 +80,13 @@ export default function ProfileScreen({ navigation }: any) {
       if (form.emergency_contacts.length === 0) {
         Alert.alert('Acil durum numarası boş olamaz');
         return;
+      }
+
+      if (form.emergency_contacts.length > MAX_CONTACTS) {
+        Alert.alert(
+          'Uyarı',
+          `En fazla ${MAX_CONTACTS} numara kaydedebilirsin.`,
+        );
       }
 
       const contactsAsString = form.emergency_contacts

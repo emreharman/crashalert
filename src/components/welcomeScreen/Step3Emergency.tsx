@@ -28,6 +28,11 @@ export default function Step3Contacts({ onNext, initialContacts = [] }: Props) {
       return;
     }
 
+    if (contacts.length >= 3) {
+      Alert.alert('Uyarı', 'En fazla 3 numara ekleyebilirsin.');
+      return;
+    }
+
     setContacts(prev => [...prev, newContact.trim()]);
     setNewContact('');
     setInputKey(prev => prev + 1);
@@ -74,12 +79,20 @@ export default function Step3Contacts({ onNext, initialContacts = [] }: Props) {
         codeTextStyle={styles.codeTextStyle}
         flagButtonStyle={styles.flagButton}
         textInputProps={{
-          cursorColor: '#1e88e5', 
+          cursorColor: '#1e88e5',
         }}
-        renderDropdownImage={<Text style={{ color: '#fff', fontSize: 12 }}>▼</Text>}
+        renderDropdownImage={
+          <Text style={{ color: '#fff', fontSize: 12 }}>▼</Text>
+        }
       />
 
-      <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
+      <TouchableOpacity
+        style={[
+          styles.addButton,
+          contacts.length >= 3 && { backgroundColor: '#666' },
+        ]}
+        onPress={handleAdd}
+      >
         <Text style={styles.addButtonText}>+ Ekle</Text>
       </TouchableOpacity>
 
